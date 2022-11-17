@@ -55,9 +55,10 @@ for episode in range(1, episodes + 1):
         env.render()
         # Here, we will generate a random action; in contrast to the agent "considering" its observations and then
         # generating a useful action. In this case, our action space is a Discrete(2), meaning that there are only
-        # two actions available (i.e. the action is only capable of being a "1" or "0").
+        # two actions available (i.e. the action is only capable of being a "1" or "0"). This is just where the
+        # action is GENERATED; the action is actually TAKEN in the next line.
         action = env.action_space.sample()
-        # unpack our env.step function
+        # unpack our env.step function. This is where the action is ACTUALLY TAKEN.
         n_state, reward, done, info = env.step(action)
         # accumulating our reward
         score += reward
@@ -121,6 +122,60 @@ del model
 # reload model back into memory
 model = PPO.load(PPO_Path, env=env)
 
-''' ---------- 3. TESTING AND EVALUATION ---------- '''
+''' ---------- 4. EVALUATE MODEL ---------- '''
+'''
+~ Evaluation Metrics ~ 
+There are a number of metrics available from the models when trained. There are two core 
+values that you should pay attention to: 
+1. ep_len_mean - the average time (in frames) a particular episode lasted before "done".
+2. ep_rew_mean - the average reward that the agent accumulated per episode.
 
+~ Monitoring in Tensorboard ~ 
+You are able to review evaluation, time, and training metrics using Tensorboard. To use 
+Tensorboard, you must specify a logging directory when you initialise your model:
+in code -> model = A2C("CnnPolicy", env, verbose=1, tensorboard_log=log_path)
+in terminal -> !tensorboard --logdir=<your_log_path_here>
+'''
+# This line evaluates/tests our policy. we pass through our model, the environment, the number of episodes we wish to
+# do testing with, and whether or not we wish to render the environment.
+mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, render=True)
+print(f"Average reward = {mean_reward}, Standard deviation of reward = {std_reward}")
+# now we close out our environment
+env.close()
+
+''' ---------- 5. TEST MODEL ---------- '''
+
+# look at section 2 for more comments on this block of code
+episodes = 5
+for episode in range(1, episodes + 1):
+    # Changed "state" to "obs".
+    obs = env.reset()
+    done = False
+    score = 0
+
+    while not done:
+        env.render()
+        # Here, we make a key change from section 2. "model.predict()" will output our "action" and our "states".
+        # Previously, we generated random actions to train the model. Now, we will generate actions based upon
+        # observations made by our model. We will pass our observations through the function as arguments. WE ARE
+        # USING ARE MODEL HERE!!!!!!!!
+        action, _ = model.predict(observation=obs)
+        # Changed "n_state" to "obs".
+        obs, reward, done, info = env.step(action)
+        # With a successful model, your total score will be 200. Your total score will be 200 because your score is
+        # the total sumation of your rewards after each step. Our environment rewards the agent with 1 reward-point
+        # after every time step (or "frame") that the pole remains upright. Since there are 200 total frames in the
+        # environment, a perfect score is 200 reward-points. If you do not understand the way the reward system
+        # works, consult the environment code.
+        score += reward
+    print('Episode:{} Score:{}'.format(episode, score))
+env.close()
+
+''' ---------- 6. VIEW LOGS IN TENSORBOARD ---------- '''
+'''
+If you are training a much larger or much more sophisticated environment, you may want to view the training logs 
+with Tensorport. 
+'''
+# Specify a path to your log file.
+training_log_path = os.path.join(log_path, "PPO_10")
 
