@@ -16,14 +16,17 @@ Environments are represented by "spaces". Many different types of spaces. Some i
 import os
 
 ''' ---------- 1. IMPORT DEPENDENCIES ---------- '''
+print("1. IMPORT DEPENDENCIES")
 import gym
 from stable_baselines3 import PPO
 # DummyVecEnv allows you to vectorize environments. Allows for training multiple environments at the same time.
 from stable_baselines3.common.vec_env import DummyVecEnv
 # evaluate_policy makes it easier to see how well model is running.
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 
 ''' ---------- 2. LOAD ENVIRONMENT ---------- '''
+print("2. LOAD ENVIRONMENT")
 # This is case-sensitive. This is a mapping to the pre-installed gym environment.
 environment_name = 'CartPole-v0'
 # Here, we are making our environment.
@@ -122,7 +125,8 @@ del model
 # reload model back into memory
 model = PPO.load(PPO_Path, env=env)
 
-''' ---------- 4. EVALUATE MODEL ---------- '''
+''' ---------- 4. TEST AND EVALUATE MODEL ---------- '''
+print("4. TEST AND EVALUATE MODEL")
 '''
 ~ Evaluation Metrics ~ 
 There are a number of metrics available from the models when trained. There are two core 
@@ -143,8 +147,7 @@ print(f"Average reward = {mean_reward}, Standard deviation of reward = {std_rewa
 # now we close out our environment
 env.close()
 
-''' ---------- 5. TEST MODEL ---------- '''
-
+''' --------- TEST MODEL ---------- '''
 # look at section 2 for more comments on this block of code
 episodes = 5
 for episode in range(1, episodes + 1):
@@ -171,11 +174,111 @@ for episode in range(1, episodes + 1):
     print('Episode:{} Score:{}'.format(episode, score))
 env.close()
 
-''' ---------- 6. VIEW LOGS IN TENSORBOARD ---------- '''
+''' ---------- VIEW LOGS IN TENSORBOARD ---------- '''
 '''
 If you are training a much larger or much more sophisticated environment, you may want to view the training logs 
-with Tensorport. 
-'''
-# Specify a path to your log file.
-training_log_path = os.path.join(log_path, "PPO_10")
+with Tensorboard. 
 
+~ Monitoring in Tensorboard ~ 
+You are able to review evaluation, time, and training metrics using Tensorboard. To use 
+Tensorboard, you must specify a logging directory when you initialise your model:
+1. in code -> model = A2C("CnnPolicy", env, verbose=1, tensorboard_log=log_path)
+2. in terminal -> tensorboard --logdir=<your_log_path_here>
+3. copy and paste the url into your internet browser
+4. view your log data
+'''
+
+''' ---------- PERFORMANCE TUNING ---------- '''
+'''
+There are some ore metrics to look at: 
+1. Average reward - Gives you an indication as to how well your model is 
+going to preform in that particular environment and that particular reward function. 
+2. Average Episode Length - How long your agent is surviving in that particular environment.
+
+If your model isn't working well, there are three strategies that you should look at:
+1. Train for longer - put more time into the training process. 
+2. Hyperparameter Tuning
+3. Take a look at other algorithms
+'''
+
+''' ---------- 5. CALLBACKS, ALT ALGORITHMS, AND ARCHITECTURES ---------- '''
+print("5. CALLBACKS, ALT ALGORITHMS, AND ARCHITECTURES")
+'''
+---------- APPLYING CALLBACKS ---------- 
+You can leverage callback functions as part of stable baselines to log out data or save the model under certain 
+conditions. The callbacks allow you to manage large models before they become unstable.
+1. Import callback helpers:
+    from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
+2. Set up callbacks
+    stop_callback = StopTrainingOnRewardThreshold(reward_threshold=190, verbose=1)
+    eval_callback = EvalCallback(env,callback_on_new_best=stop_callback, eval_freq=10000, best_model_save_path=save_path, verbose=1)
+3. Apply callbacks to train step
+    model.learn(total_timesteps=20000, callback=eval_callback)
+
+---------- Modifying Neural Network Architecture ---------- 
+You are also able to change the underlying neural network which StableBaselines uses as part of the policy.
+1. Define new MLP Network
+    net_arch = [dict(pi=[128, 128, 128, 128], vf=[128, 128, 128, 128])]
+2. Apply Network
+    model = PPO('MlpPolicy', env, verbose=1, policy_kwargs={'net_arch': net_arch}) 
+
+---------- Using Different Algorithms ---------- 
+Stable Baselines coes pre-packaged with a number of different algorithms that can be used to train your agent.
+1. Import DQN
+    from stable_baselines3 import DQN
+2. Set up DQN
+    model = DQN('MlpPolicy', env, verbose=1, tensorboard_log=log_path)
+'''
+
+'''---------- Adding A Callback To Training Stage ---------- '''
+print("Train model with callback")
+# This is really important to use when you are training huge models that take a lot of time to train.
+# import new dependencies - see top of code
+# define save path for our best model
+save_path = os.path.join('Training', 'Saved_Models')
+# Set up training callbacks
+# This will stop training once we reach a certain reward threshold
+stop_callback = StopTrainingOnRewardThreshold(reward_threshold=200, verbose=1)
+# This callback will be triggered after ev4ry training run. Basically, after every 10000 steps, the callback is going
+# to check if the model has reached the reward threshold. If the model has surpassed the threshold, this callback will
+# stop the training. Also, the callback will save the best model to the specified save path.
+eval_callback = EvalCallback(env,
+                             callback_on_new_best=stop_callback,
+                             eval_freq=10000,
+                             best_model_save_path=save_path,
+                             verbose=1)
+# set up new training model
+model = PPO('MlpPolicy', env, verbose=1, tensorboard_log=log_path)
+# We are training our model with the callback involved now. We can find our "best model" in the log path.
+model.learn(total_timesteps=20000, callback=eval_callback)
+del model
+model_path = os.path.join('Training', 'Saved Models', 'best_model')
+model = PPO.load(model_path, env=env)
+evaluate_policy(model, env, n_eval_episodes=10, render=True)
+env.close()
+
+'''---------- Changing Policies ---------- '''
+print("Changed policy")
+# Changing what type of neural network architecture that we use.
+# Network Architecture - this is an example of specifying a different architecture for the different neural networks
+# used in PPO. You can also simplify this and use: new_arch=[128,128] to use the same for both.
+# The first neural network architecture we define is for our "custom actor". We pass through "pi" which is a new neural
+# network comprised of four layers of 128 units. Next, we specify four layers of 128 units for our value function.
+net_arch = [dict(pi=[128, 128, 128, 128], vf=[128, 128, 128, 128])]
+# Associate this new architecture to our model
+model = PPO('MlpPoly', env, verbose=1, tensorboard_log=log_path, policy_kwargs={'net_arch': net_arch})
+# Train model using callback
+model.learn(total_timesteps=20000, callback=eval_callback)
+
+'''---------- Using an Alternate Algorithm ---------- '''
+# Import a DQL algorithm
+from stable_baselines3 import DQN
+
+# set up DQN model
+model = DQN('MlpPoly', env, verbose=1, tensorboard_log=log_path)
+model.learn(total_timesteps=20000, callback=eval_callback)
+dqn_path = os.path.join('Training', 'Saved Models', 'DQN_model')
+model.save(dqn_path)
+model = DQN.load(dqn_path, env=env)
+evaluate_policy(model, env, n_eval_episodes=10, render=True)
+env.close()
