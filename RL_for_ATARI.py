@@ -16,7 +16,7 @@ import os
 # import anymore. You must paste the .rar files into your project folder.
 # Link is: http://www.atarimania.com/roms/Roms.rar
 
-# Then, you must run this command into you terminal (it will point to the
+# Then, you must run this command into you terminal to install the environments (it will point to the
 # ROMS directories): python -m atari_py.import_roms ./ROMS/ROMS
 
 environment_name = 'Breakout-v0'
